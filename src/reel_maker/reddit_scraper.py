@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import requests
+from requests import RequestException
 
 
 SortMode = Literal["hot", "new", "top"]
@@ -41,8 +42,13 @@ def fetch_story(
     if sort == "top":
         params["t"] = period
 
-    response = requests.get(endpoint, params=params, headers=headers, timeout=20)
-    response.raise_for_status()
+    try:
+        response = requests.get(endpoint, params=params, headers=headers, timeout=20)
+        response.raise_for_status()
+    except RequestException as exc:
+        raise RedditStoryNotFoundError(
+            f"Could not fetch r/{subreddit} ({type(exc).__name__}). Trying another subreddit."
+        ) from exc
 
     payload = response.json()
     posts = payload.get("data", {}).get("children", [])
