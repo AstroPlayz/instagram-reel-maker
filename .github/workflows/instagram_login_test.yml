@@ -1,0 +1,43 @@
+name: Instagram Login Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  login-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install instagrapi
+        run: |
+          python -m pip install --upgrade pip
+          pip install instagrapi
+
+      - name: Test Instagram login only
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import os
+          from instagrapi import Client
+
+          username = os.environ.get("INSTAGRAM_USERNAME", "").strip()
+          password = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
+          if not username or not password:
+              raise SystemExit("Missing INSTAGRAM_USERNAME or INSTAGRAM_PASSWORD secrets")
+
+          client = Client()
+          client.login(username, password)
+          client.get_timeline_feed()
+          print("INSTAGRAM_LOGIN_OK")
+          PY
