@@ -34,23 +34,47 @@ def fetch_story(
     allow_nsfw: bool = False,
 ) -> RedditStory:
     headers = {
-        "User-Agent": "instagram-reel-maker/0.1 (by u/story_reel_bot)",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/122.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
     }
 
-    endpoint = f"https://www.reddit.com/r/{subreddit}/{sort}.json"
-    params = {"limit": limit}
+    base_params = {"limit": limit}
     if sort == "top":
-        params["t"] = period
+        base_params["t"] = period
 
-    try:
-        response = requests.get(endpoint, params=params, headers=headers, timeout=20)
-        response.raise_for_status()
-    except RequestException as exc:
+    endpoints = [
+        f"https://api.reddit.com/r/{subreddit}/{sort}",
+        f"https://www.reddit.com/r/{subreddit}/{sort}.json",
+        f"https://old.reddit.com/r/{subreddit}/{sort}.json",
+    ]
+
+    payload = None
+    last_error: Exception | None = None
+    for endpoint in endpoints:
+        params = dict(base_params)
+        if "reddit.com" in endpoint:
+            params["raw_json"] = 1
+
+        try:
+            response = requests.get(endpoint, params=params, headers=headers, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+            break
+        except RequestException as exc:
+            last_error = exc
+            continue
+
+    if payload is None:
+        reason = type(last_error).__name__ if last_error else "RequestException"
         raise RedditStoryNotFoundError(
-            f"Could not fetch r/{subreddit} ({type(exc).__name__}). Trying another subreddit."
-        ) from exc
+            f"Could not fetch r/{subreddit} ({reason}). Trying another subreddit."
+        )
 
-    payload = response.json()
     posts = payload.get("data", {}).get("children", [])
 
     for post in posts:
