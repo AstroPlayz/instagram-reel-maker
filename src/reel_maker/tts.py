@@ -37,6 +37,26 @@ async def _render_sentence(text: str, output_path: Path, tone: NarrationTone) ->
     await communicator.save(str(output_path))
 
 
+async def _render_sentence_with_retry(
+    text: str,
+    output_path: Path,
+    tone: NarrationTone,
+    max_attempts: int = 5,
+) -> None:
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await _render_sentence(text, output_path, tone)
+            return
+        except Exception as exc:
+            last_exc = exc
+            if attempt == max_attempts:
+                break
+            await asyncio.sleep(min(10, 1.5 * attempt))
+    if last_exc is not None:
+        raise last_exc
+
+
 async def _render_all_sentences(
     sentence_tones: list[tuple[str, NarrationTone]],
     tmp_dir: Path,
@@ -44,9 +64,13 @@ async def _render_all_sentences(
     paths: list[Path] = []
     for idx, (sentence, tone) in enumerate(sentence_tones):
         clip_path = tmp_dir / f"sentence_{idx:04d}.mp3"
-        await _render_sentence(sentence, clip_path, tone)
+        await _render_sentence_with_retry(sentence, clip_path, tone)
         paths.append(clip_path)
     return paths
+
+
+async def _render_full_text_with_retry(text: str, output_path: Path, tone: NarrationTone) -> None:
+    await _render_sentence_with_retry(text, output_path, tone, max_attempts=6)
 
 
 def _concatenate_mp3s(segment_paths: list[Path], output_path: Path) -> None:
@@ -69,15 +93,19 @@ def synthesize_tts(text: str, output_audio: Path) -> TTSResult:
 
     sentence_tones = analyze_sentence_tones(sentences)
 
+    overall_tone = analyze_tone(text)
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        segment_paths = asyncio.run(_render_all_sentences(sentence_tones, tmp_dir))
-        if len(segment_paths) == 1:
-            import shutil
-            shutil.copy2(segment_paths[0], output_audio)
-        else:
-            _concatenate_mp3s(segment_paths, output_audio)
+        try:
+            segment_paths = asyncio.run(_render_all_sentences(sentence_tones, tmp_dir))
+            if len(segment_paths) == 1:
+                import shutil
+                shutil.copy2(segment_paths[0], output_audio)
+            else:
+                _concatenate_mp3s(segment_paths, output_audio)
+        except Exception as exc:
+            print(f"[TTS] Per-sentence synthesis failed ({type(exc).__name__}); retrying with single-pass TTS...")
+            asyncio.run(_render_full_text_with_retry(text, output_audio, overall_tone))
 
     # Return overall tone based on full-text analysis for metadata
-    overall_tone = analyze_tone(text)
     return TTSResult(audio_path=output_audio, tone=overall_tone)
