@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "instagram-reel-maker"
+version = "0.1.0"
+description = "Generate Instagram-ready reels from Reddit stories using TTS + Whisper captions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "click>=8.1.7",
+  "edge-tts>=6.1.12",
+  "google-api-python-client>=2.100.0",
+  "instagrapi>=2.0.0",
+  "google-auth>=2.23.0",
+  "google-auth-httplib2>=0.1.1",
+  "google-auth-oauthlib>=1.0.0",
+  "moviepy>=1.0.3",
+  "numpy>=1.26.4",
+  "openai-whisper>=20231117",
+  "Pillow>=10.2.0",
+  "requests>=2.32.3",
+  "transformers>=4.39.3",
+]
+
+[project.scripts]
+make-reel = "reel_maker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

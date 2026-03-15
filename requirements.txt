@@ -1,0 +1,13 @@
+click>=8.1.7
+edge-tts>=6.1.12
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-httplib2>=0.1.1
+google-auth-oauthlib>=1.0.0
+instagrapi>=2.0.0
+moviepy>=1.0.3
+numpy>=1.26.4
+openai-whisper>=20231117
+Pillow>=10.2.0
+requests>=2.32.3
+transformers>=4.39.3

@@ -1,0 +1,110 @@
+name: Generate & Publish Reel
+
+on:
+  schedule:
+    # Runs every hour at minute 0 (UTC)
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      subreddit:
+        description: "Subreddit to scrape"
+        required: false
+        default: "random"
+      sort:
+        description: "Sort mode (top/hot/new)"
+        required: false
+        default: "top"
+      period:
+        description: "Top period (day/week/month/year/all)"
+        required: false
+        default: "week"
+      upload_instagram:
+        description: "Upload to Instagram (true/false)"
+        required: false
+        default: "true"
+      upload_youtube:
+        description: "Upload to YouTube Shorts (true/false)"
+        required: false
+        default: "true"
+
+jobs:
+  generate-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install system dependencies (ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-liberation
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Download background video (if URL secret is set)
+        env:
+          BACKGROUND_VIDEO_URL: ${{ secrets.BACKGROUND_VIDEO_URL }}
+        run: |
+          mkdir -p Videos
+          if [ -n "$BACKGROUND_VIDEO_URL" ]; then
+            echo "Downloading background video from URL..."
+            curl -L "$BACKGROUND_VIDEO_URL" -o Videos/background.mp4
+          else
+            echo "Using background videos from repository (Git LFS)."
+            ls -lh Videos/ || echo "Warning: Videos/ directory is empty."
+          fi
+
+      - name: Resolve CLI flags
+        id: flags
+        run: |
+          SUBREDDIT="${{ github.event.inputs.subreddit || 'random' }}"
+          SORT="${{ github.event.inputs.sort || 'top' }}"
+          PERIOD="${{ github.event.inputs.period || 'week' }}"
+          UPLOAD_IG="${{ github.event.inputs.upload_instagram || 'true' }}"
+          UPLOAD_YT="${{ github.event.inputs.upload_youtube || 'true' }}"
+
+          FLAGS="--subreddit $SUBREDDIT --sort $SORT --period $PERIOD --max-words 130 --whisper-model base --output output/instagram_reel.mp4"
+          [ "$UPLOAD_IG" = "true" ] && FLAGS="$FLAGS --upload-instagram"
+          [ "$UPLOAD_YT" = "true" ] && FLAGS="$FLAGS --upload-youtube"
+
+          echo "flags=$FLAGS" >> "$GITHUB_OUTPUT"
+          echo "Resolved flags: $FLAGS"
+
+      - name: Generate reel and upload
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python -m reel_maker.cli ${{ steps.flags.outputs.flags }}
+
+      - name: Upload reel as artifact (for inspection)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-reel-${{ github.run_number }}
+          path: output/instagram_reel.mp4
+          retention-days: 7
+
+      - name: Upload story metadata as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-source-${{ github.run_number }}
+          path: output/story_source.txt
+          retention-days: 7
