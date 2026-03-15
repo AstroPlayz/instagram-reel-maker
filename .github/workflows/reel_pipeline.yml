@@ -21,7 +21,7 @@ on:
       upload_instagram:
         description: "Upload to Instagram (true/false)"
         required: false
-        default: "true"
+        default: "false"
       upload_youtube:
         description: "Upload to YouTube Shorts (true/false)"
         required: false
@@ -73,7 +73,7 @@ jobs:
           SUBREDDIT="${{ github.event.inputs.subreddit || 'random' }}"
           SORT="${{ github.event.inputs.sort || 'top' }}"
           PERIOD="${{ github.event.inputs.period || 'week' }}"
-          UPLOAD_IG="${{ github.event.inputs.upload_instagram || 'true' }}"
+          UPLOAD_IG="${{ github.event.inputs.upload_instagram || 'false' }}"
           UPLOAD_YT="${{ github.event.inputs.upload_youtube || 'true' }}"
 
           FLAGS="--subreddit $SUBREDDIT --sort $SORT --period $PERIOD --max-words 130 --whisper-model base --output output/instagram_reel.mp4"
@@ -85,8 +85,6 @@ jobs:
 
       - name: Generate reel and upload
         env:
-          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
-          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
