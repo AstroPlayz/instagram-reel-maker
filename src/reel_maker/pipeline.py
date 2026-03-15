@@ -277,18 +277,24 @@ class ReelPipeline:
 
         if self.config.upload_instagram:
             from reel_maker.instagram_uploader import upload_reel_to_instagram
-            result.instagram_media_id = upload_reel_to_instagram(video_path, ig_caption)
+            try:
+                result.instagram_media_id = upload_reel_to_instagram(video_path, ig_caption)
+            except Exception as exc:
+                print(f"[Instagram] Upload skipped due to error: {type(exc).__name__}: {exc}")
 
         if self.config.upload_youtube:
             from reel_maker.youtube_uploader import upload_reel_to_youtube
             yt_tags = [
                 t.lstrip("#") for t in yt_tags_str.split() if t.startswith("#")
             ]
-            result.youtube_video_id = upload_reel_to_youtube(
-                video_path=video_path,
-                title=story.title,
-                description=yt_caption,
-                tags=yt_tags,
-            )
+            try:
+                result.youtube_video_id = upload_reel_to_youtube(
+                    video_path=video_path,
+                    title=story.title,
+                    description=yt_caption,
+                    tags=yt_tags,
+                )
+            except Exception as exc:
+                print(f"[YouTube] Upload skipped due to error: {type(exc).__name__}: {exc}")
 
         return result
